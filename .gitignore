@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+
+# Tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# keygate workspaces -- these hold the real upstream key and the usage database
+.keygate/
+*.keygate/
+keygate.db
+keygate.db-wal
+keygate.db-shm
+config.json
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
