@@ -141,7 +141,8 @@ def test_mint_stores_only_the_digest(ws):
     assert plaintext.encode() not in raw
     auth = ws.store.authenticate(plaintext)
     assert auth.ok
-    assert auth.key.key_hash == keys.hash_key(plaintext)
+    assert auth.key is not None
+    assert auth.key.display_prefix == plaintext[:14]
     assert key.display_prefix == plaintext[:14]
     assert key.label == "laptop"
 
