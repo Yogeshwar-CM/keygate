@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="robots" content="noindex, nofollow">
+<title>keygate</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='4' fill='%237dd3fc'/%3E%3Cpath d='M5 8h6M9 5.5 11.5 8 9 10.5' stroke='%2304131e' stroke-width='1.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="/dash/styles.css">
+</head>
+<body>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brand__mark" aria-hidden="true">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 8h7M9 5.5 11.5 8 9 10.5"/>
+        </svg>
+      </span>
+      <span>
+        <span class="brand__name">keygate</span><br>
+        <span class="brand__version" id="brand-version">—</span>
+      </span>
+    </div>
+
+    <nav class="nav" id="nav" aria-label="Sections"></nav>
+
+    <div class="sidebar__foot">
+      <div class="meta">
+        <span class="eyebrow">Workspace</span>
+        <span class="meta__value" id="meta-workspace" title="">—</span>
+      </div>
+      <div class="meta">
+        <span class="eyebrow">Upstream</span>
+        <span class="meta__value" id="meta-upstream" title="">—</span>
+      </div>
+      <div class="meta">
+        <span class="eyebrow">Admin API</span>
+        <span class="meta__value">unauthenticated · loopback</span>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <h1 class="topbar__title" id="view-title">Overview</h1>
+      <span class="topbar__sub" id="view-sub"></span>
+      <span class="grow"></span>
+      <span class="pip" id="live-pip" title="Auto-refresh every 8s">
+        <span class="pip__dot"></span><span id="live-text">live</span>
+      </span>
+      <button class="btn btn--sm" id="btn-refresh" type="button" title="Reload this view">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M13.5 8a5.5 5.5 0 1 1-1.7-3.9"/><path d="M13.5 2v3h-3"/>
+        </svg>
+        Refresh
+      </button>
+    </header>
+
+    <div class="content" id="view"></div>
+  </main>
+</div>
+
+<div class="overlay" id="overlay" hidden role="dialog" aria-modal="true"
+     aria-labelledby="modal-title"></div>
+
+<div class="toaster" id="toaster" aria-live="polite" aria-atomic="false"></div>
+
+<noscript>
+  <p style="padding:24px;color:#9298ab;font-family:ui-sans-serif,system-ui">
+    The keygate dashboard needs JavaScript. Everything it does is also available
+    from the CLI (<code>keygate user list</code>, <code>keygate usage</code>) and
+    from the JSON API under <code>/admin/api/</code>.
+  </p>
+</noscript>
+
+<script src="/dash/app.js"></script>
+</body>
+</html>

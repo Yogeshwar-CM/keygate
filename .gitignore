@@ -23,6 +23,9 @@ keygate.db-wal
 keygate.db-shm
 config.json
 
+# Agent scratch files
+.claude-task-*.md
+
 # Editors / OS
 .DS_Store
 .idea/

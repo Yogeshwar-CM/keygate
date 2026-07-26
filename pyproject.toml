@@ -4,12 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "keygate"
-version = "0.1.0"
-description = "Local org API-key gateway: one real upstream key, per-user virtual keys, budgets, audit log."
+version = "0.2.0"
+description = "Local org API-key gateway: one real upstream key, per-user virtual keys, budgets, audit log, web dashboard."
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.10"
-keywords = ["openai", "api-key", "gateway", "proxy", "budget", "llmops"]
+keywords = ["openai", "api-key", "gateway", "proxy", "budget", "llmops", "dashboard"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Environment :: Console",
@@ -38,6 +38,11 @@ Issues = "https://github.com/keygate-dev/keygate/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+# The dashboard is served straight out of the installed package, so its assets
+# have to travel with the wheel.
+[tool.setuptools.package-data]
+keygate = ["dashboard/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

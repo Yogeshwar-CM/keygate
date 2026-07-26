@@ -262,7 +262,11 @@ class Store:
     # -- users ---------------------------------------------------------------
 
     def add_user(
-        self, name: str, email: str | None = None, budget_usd: float | None = None
+        self,
+        name: str,
+        email: str | None = None,
+        budget_usd: float | None = None,
+        actor: str = "cli",
     ) -> User:
         name = name.strip()
         if not name:
@@ -278,7 +282,7 @@ class Store:
                 )
         except sqlite3.IntegrityError:
             raise KeygateError(f"user {name!r} already exists") from None
-        self.log_audit("cli", "user.add", name, json.dumps({"budget_usd": budget_usd}))
+        self.log_audit(actor, "user.add", name, json.dumps({"budget_usd": budget_usd}))
         user = self.get_user_by_id(int(cur.lastrowid))
         assert user is not None
         return user
@@ -305,14 +309,18 @@ class Store:
         rows = self.conn.execute("SELECT * FROM users ORDER BY name").fetchall()
         return [_row_to_user(r) for r in rows]
 
-    def set_user_budget(self, name: str, budget_usd: float | None) -> User:
+    def set_user_budget(
+        self, name: str, budget_usd: float | None, actor: str = "cli"
+    ) -> User:
         user = self.require_user(name)
+        if budget_usd is not None and budget_usd < 0:
+            raise KeygateError("budget may not be negative")
         with self.conn:
             self.conn.execute(
                 "UPDATE users SET budget_usd = ? WHERE id = ?", (budget_usd, user.id)
             )
         self.log_audit(
-            "cli", "user.budget", name, json.dumps({"budget_usd": budget_usd})
+            actor, "user.budget", name, json.dumps({"budget_usd": budget_usd})
         )
         refreshed = self.get_user_by_id(user.id)
         assert refreshed is not None
@@ -325,6 +333,7 @@ class Store:
         user_name: str,
         label: str | None = None,
         budget_usd: float | None = None,
+        actor: str = "cli",
     ) -> tuple[str, Key]:
         """Mint a key for ``user_name``; returns ``(plaintext, key)``.
 
@@ -348,7 +357,7 @@ class Store:
                 ),
             )
         self.log_audit(
-            "cli",
+            actor,
             "key.mint",
             minted.display_prefix,
             json.dumps({"user": user.name, "label": label, "budget_usd": budget_usd}),
@@ -375,7 +384,7 @@ class Store:
         sql += " ORDER BY k.created_at"
         return [_row_to_key(r) for r in self.conn.execute(sql, params).fetchall()]
 
-    def revoke_key(self, prefix: str) -> Key:
+    def revoke_key(self, prefix: str, actor: str = "cli") -> Key:
         """Revoke the single live key whose display prefix starts with ``prefix``."""
         rows = self.conn.execute(
             "SELECT * FROM keys WHERE display_prefix LIKE ? AND revoked_at IS NULL",
@@ -392,7 +401,7 @@ class Store:
             self.conn.execute(
                 "UPDATE keys SET revoked_at = ? WHERE id = ?", (utcnow(), key.id)
             )
-        self.log_audit("cli", "key.revoke", key.display_prefix, None)
+        self.log_audit(actor, "key.revoke", key.display_prefix, None)
         refreshed = self.get_key_by_id(key.id)
         assert refreshed is not None
         return refreshed

@@ -78,7 +78,7 @@ def cmd_init(args: argparse.Namespace) -> int:
     print(f"  export KEYGATE_DIR={workspace.path}")
     print("  keygate user add alice --budget 25")
     print("  keygate user mint alice")
-    print("  keygate serve")
+    print("  keygate serve            # then open http://127.0.0.1:8787/dash")
     return 0
 
 
@@ -225,15 +225,20 @@ def cmd_serve(args: argparse.Namespace) -> int:
         )
     if str(host) not in {"127.0.0.1", "::1", "localhost"}:
         print(
-            f"warning: listening on {host} -- keygate speaks plain HTTP with no "
-            "admin auth. Put it behind TLS and a trusted network.",
+            f"warning: listening on {host} -- keygate speaks plain HTTP and the "
+            "dashboard and admin API have NO authentication. Anyone who can "
+            "reach this port can mint keys. Put it behind TLS and a trusted "
+            "network, or bind 127.0.0.1.",
             file=sys.stderr,
         )
 
-    print(f"keygate {__version__} listening on http://{host}:{port}")
-    print(f"  workspace {workspace.path}")
-    print(f"  upstream  {workspace.upstream_base_url}")
-    print("  routes    POST /v1/chat/completions, GET /v1/models, GET /healthz")
+    shown = "[::1]" if str(host) == "::" else str(host)
+    print(f"keygate {__version__} listening on http://{shown}:{port}")
+    print(f"  workspace  {workspace.path}")
+    print(f"  upstream   {workspace.upstream_base_url}")
+    print(f"  dashboard  http://{shown}:{port}/dash")
+    print(f"  admin api  http://{shown}:{port}/admin/api/...  (unauthenticated)")
+    print("  proxy      POST /v1/chat/completions, GET /v1/models, GET /healthz")
     workspace.store.log_audit("cli", "serve.start", f"{host}:{port}", None)
     try:
         server.serve_forever()
@@ -399,11 +404,17 @@ def build_parser() -> argparse.ArgumentParser:
     p_krevoke.add_argument("prefix", help="leading characters of the key, e.g. kg_v1_ab")
     p_krevoke.set_defaults(func=cmd_key_revoke)
 
-    p_serve = sub.add_parser("serve", help="run the gateway")
-    p_serve.add_argument("--host", help="override config listen_host")
-    p_serve.add_argument("--port", type=int, help="override config listen_port")
-    p_serve.add_argument("--quiet", action="store_true", help="suppress access log")
-    p_serve.set_defaults(func=cmd_serve)
+    # 'dash' is an alias, not a second server: one process serves the proxy,
+    # the dashboard and the admin API off the same port.
+    for name, help_text in (
+        ("serve", "run the gateway and the dashboard"),
+        ("dash", "alias for 'serve' -- same server, same flags"),
+    ):
+        p_serve = sub.add_parser(name, help=help_text)
+        p_serve.add_argument("--host", help="override config listen_host")
+        p_serve.add_argument("--port", type=int, help="override config listen_port")
+        p_serve.add_argument("--quiet", action="store_true", help="suppress access log")
+        p_serve.set_defaults(func=cmd_serve)
 
     p_usage = sub.add_parser("usage", help="show spend")
     p_usage.add_argument("--user")

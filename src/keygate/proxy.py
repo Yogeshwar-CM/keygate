@@ -5,11 +5,17 @@ virtual key (``kg_v1_...``), checks the caller's budget, forwards the request
 to the configured upstream with the single real API key, and records token
 usage and cost in the request log.
 
+The same server also hosts the local control room: the packaged single-page
+dashboard under ``/dash`` and its JSON API under ``/admin/api``. Neither is
+authenticated -- see :mod:`keygate.admin`.
+
 Supported routes:
 
 ``GET  /healthz``               local liveness check, no auth
 ``GET  /v1/models``             authenticated pass-through
 ``POST /v1/chat/completions``   authenticated, metered, streaming or not
+``GET  /`` and ``/dash/*``      dashboard assets, no auth
+``*    /admin/api/*``           admin JSON API, no auth
 """
 
 from __future__ import annotations
@@ -23,7 +29,7 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
-from . import __version__
+from . import __version__, admin
 from .keys import parse_bearer
 from .store import Workspace
 
@@ -141,10 +147,33 @@ class GatewayHandler(BaseHTTPRequestHandler):
             return None
         return self.rfile.read(length)
 
+    def _read_admin_body(self) -> bytes | None:
+        """Like :meth:`_read_body`, but a missing Content-Length means empty.
+
+        ``POST .../revoke`` carries nothing, and neither ``fetch`` nor ``curl``
+        can be relied on to send ``Content-Length: 0`` for it.
+        """
+        if self.headers.get("Content-Length") is None:
+            if self.headers.get("Transfer-Encoding", "").lower() == "chunked":
+                self._send_error_json(
+                    411,
+                    "chunked request bodies are not supported; send Content-Length",
+                    "length_required",
+                    close=True,
+                )
+                return None
+            return b""
+        return self._read_body()
+
     # -- routing -------------------------------------------------------------
 
+    def _split_path(self) -> tuple[str, str]:
+        """Return ``(normalized_path, query_string)`` for this request."""
+        raw, _, query = self.path.partition("?")
+        return raw.rstrip("/") or "/", query
+
     def do_GET(self) -> None:  # noqa: N802 - name mandated by BaseHTTPRequestHandler
-        path = self.path.split("?", 1)[0].rstrip("/") or "/"
+        path, query = self._split_path()
         if path == HEALTH_PATH:
             self._send_bytes(
                 200, json.dumps({"status": "ok", "version": __version__}).encode()
@@ -153,10 +182,25 @@ class GatewayHandler(BaseHTTPRequestHandler):
         if path == MODELS_PATH:
             self._handle_proxied(MODELS_PATH, method="GET", body=None)
             return
+        if path == admin.API_PREFIX or path.startswith(admin.API_PREFIX + "/"):
+            self._handle_admin("GET", path, query, None)
+            return
+        if path in ("/", admin.DASH_PREFIX):
+            self._serve_asset(admin.INDEX_NAME)
+            return
+        if path.startswith(admin.DASH_PREFIX + "/"):
+            self._serve_asset(path[len(admin.DASH_PREFIX) + 1 :])
+            return
         self._send_error_json(404, f"unknown route {path}", "not_found")
 
     def do_POST(self) -> None:  # noqa: N802
-        path = self.path.split("?", 1)[0].rstrip("/") or "/"
+        path, query = self._split_path()
+        if path == admin.API_PREFIX or path.startswith(admin.API_PREFIX + "/"):
+            body = self._read_admin_body()
+            if body is None:
+                return
+            self._handle_admin("POST", path, query, body)
+            return
         if path != CHAT_COMPLETIONS_PATH:
             self._send_error_json(
                 404,
@@ -169,6 +213,51 @@ class GatewayHandler(BaseHTTPRequestHandler):
         if body is None:
             return
         self._handle_proxied(CHAT_COMPLETIONS_PATH, method="POST", body=body)
+
+    def do_PATCH(self) -> None:  # noqa: N802
+        path, query = self._split_path()
+        if not (path == admin.API_PREFIX or path.startswith(admin.API_PREFIX + "/")):
+            self._send_error_json(
+                404, f"unknown route {path}", "not_found", close=True
+            )
+            return
+        body = self._read_admin_body()
+        if body is None:
+            return
+        self._handle_admin("PATCH", path, query, body)
+
+    # -- dashboard and admin API ---------------------------------------------
+
+    def _handle_admin(
+        self, method: str, path: str, query: str, body: bytes | None
+    ) -> None:
+        try:
+            status, payload = admin.dispatch(
+                self.workspace, method, path, query, body
+            )
+        except Exception as exc:  # pragma: no cover - defensive
+            status, payload = 500, admin.error_payload(
+                f"admin request failed: {exc}", "internal_error"
+            )
+        self._send_bytes(status, json.dumps(payload, default=str).encode("utf-8"))
+
+    def _serve_asset(self, name: str) -> None:
+        found = admin.read_asset(name)
+        if found is None:
+            self._send_error_json(
+                404, f"no dashboard asset {name!r}", "not_found"
+            )
+            return
+        payload, content_type = found
+        self.send_response(200)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(payload)))
+        # The dashboard ships inside the wheel and is edited during development;
+        # revalidating every load is cheaper than explaining a stale cache.
+        self.send_header("Cache-Control", "no-cache")
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(payload)
 
     # -- the actual proxy ----------------------------------------------------
 

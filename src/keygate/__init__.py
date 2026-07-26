@@ -6,4 +6,4 @@ Hold one real upstream OpenAI-compatible key, hand out per-user virtual keys
 
 __all__ = ["__version__"]
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
